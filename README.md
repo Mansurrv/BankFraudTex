@@ -25,6 +25,8 @@ docker compose -f compose.yaml -f compose.railway.yaml up --build --wait --wait-
 
 Open the Railway URL, choose **Register**, and confirm the code sent to your corporate inbox. The deployment publishes the frontend on `$PORT` (8080 by default). PostgreSQL, Neo4j, analytics, and the Go API use the internal Docker network.
 
+On a Railway VM that serves `/app/index.html` while waking, use `frontend/railway-wake.html` as that fallback page. It retries until the FFBI API responds and then opens the sign-in page.
+
 For a sign-in-only deployment, set `ORBIT_REGISTRATION_DISABLED=true` with secure cookies, `ORBIT_LOCAL_TEST=false`, and the account domain. SMTP credentials are optional in this mode. Provision existing users with `ORBIT_USERS` and unique passwords. New users created by an administrator remain pending until registration is re-enabled.
 
 ## Run without Docker

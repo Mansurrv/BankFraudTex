@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>FFBI</title>
+  <style>
+    * { box-sizing: border-box }
+    body {
+      min-height: 100vh; margin: 0; padding: 28px; display: grid; place-items: center;
+      font: 17px system-ui, sans-serif; color: #18233d;
+      background: radial-gradient(ellipse at 90% 0%, #e9e4ff, transparent 65%), #f6f8ff;
+    }
+    main { width: min(100%, 500px) }
+    strong { letter-spacing: .05em; font-size: 26px }
+    h1 { margin: 24px 0 12px; font-size: clamp(28px, 6vw, 42px); line-height: 1.1 }
+    p { margin: 0 0 20px; color: #52617b; line-height: 1.5 }
+    a { color: #4942bd; text-underline-offset: .2em }
+    a:focus-visible { outline: 2px solid #4942bd; outline-offset: 4px }
+  </style>
+</head>
+<body>
+  <main id="ffbi-wake">
+    <strong>FFBI</strong>
+    <h1 id="title">FFBI запускается</h1>
+    <p id="status" role="status">Страница входа откроется автоматически, когда сервер будет готов.</p>
+    <a id="retry" href="/?ffbi-retry=1">Повторить подключение</a>
+  </main>
+  <script>
+    (() => {
+      const copy = {
+        ru: ['FFBI запускается', 'Страница входа откроется автоматически, когда сервер будет готов.', 'Повторить подключение', 'Сервер запускается дольше обычного. Подключение можно повторить.'],
+        kk: ['FFBI іске қосылып жатыр', 'Сервер дайын болғанда кіру беті автоматты түрде ашылады.', 'Қайта қосылу', 'Сервер әдеттегіден баяу іске қосылып жатыр. Қайта қосылып көріңіз.'],
+        en: ['FFBI is starting', 'The sign-in page will open automatically when the server is ready.', 'Retry connection', 'The server is taking longer than usual to start. You can retry the connection.'],
+      };
+      const preferred = navigator.language.toLowerCase().split('-')[0];
+      const language = Object.hasOwn(copy, preferred) ? preferred : 'ru';
+      const [title, opening, retryLabel, timedOut] = copy[language];
+      const status = document.getElementById('status');
+      const retry = document.getElementById('retry');
+      document.documentElement.lang = language;
+      document.getElementById('title').textContent = title;
+      status.textContent = opening;
+      retry.textContent = retryLabel;
+
+      let deadline = Date.now() + 95_000;
+      let timer;
+      let checking = false;
+      async function check() {
+        if (document.hidden || checking) return;
+        if (Date.now() >= deadline) {
+          status.textContent = timedOut;
+          return;
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        checking = true;
+        try {
+          const response = await fetch('/api/registration', {
+            cache: 'no-store', signal: controller.signal, headers: {Accept: 'application/json'},
+          });
+          if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+            const registration = await response.json();
+            if (typeof registration.enabled === 'boolean' && typeof registration.localInbox === 'boolean') {
+              const target = new URL('/', location.origin);
+              target.searchParams.set('ffbi-ready', Date.now());
+              location.replace(target);
+              return;
+            }
+          }
+        } catch {
+          // Railway may still be starting the web server or API.
+        } finally {
+          clearTimeout(timeout);
+          checking = false;
+        }
+        timer = setTimeout(check, 2500);
+      }
+      retry.addEventListener('click', event => {
+        event.preventDefault();
+        deadline = Date.now() + 95_000;
+        status.textContent = opening;
+        clearTimeout(timer);
+        check();
+      });
+      document.addEventListener('visibilitychange', () => {
+        clearTimeout(timer);
+        if (!document.hidden) check();
+      });
+      check();
+    })();
+  </script>
+</body>
+</html>
