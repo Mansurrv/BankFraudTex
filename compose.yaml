@@ -1,0 +1,87 @@
+name: orbit-financial-intelligence
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:${ORBIT_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./backend
+    environment:
+      ORBIT_ADDR: 0.0.0.0:8081
+      ORBIT_BRAND: ${ORBIT_BRAND:-FFBI}
+      ORBIT_LOCAL_TEST: ${ORBIT_LOCAL_TEST:-true}
+      ORBIT_REGISTRATION_DISABLED: ${ORBIT_REGISTRATION_DISABLED:-false}
+      ORBIT_CORPORATE_DOMAIN: ${ORBIT_CORPORATE_DOMAIN:-}
+      ORBIT_SMTP_ADDR: ${ORBIT_SMTP_ADDR:-}
+      ORBIT_SMTP_FROM: ${ORBIT_SMTP_FROM:-}
+      ORBIT_SMTP_USERNAME: ${ORBIT_SMTP_USERNAME:-}
+      ORBIT_SMTP_PASSWORD: ${ORBIT_SMTP_PASSWORD:-}
+      ORBIT_USERS: ${ORBIT_USERS:-}
+      ORBIT_SECURE_COOKIES: ${ORBIT_SECURE_COOKIES:-false}
+      ORBIT_ORIGIN: ${ORBIT_ORIGIN:-}
+      DATABASE_URL: postgres://orbit:${ORBIT_POSTGRES_PASSWORD:-orbit-postgres-demo}@postgres:5432/orbit?sslmode=disable
+      NEO4J_URL: http://neo4j:7474
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${ORBIT_NEO4J_PASSWORD:-orbit-neo4j-demo}
+      ANALYTICS_URL: http://analytics:8090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 16
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+
+  analytics:
+    build: ./analytics
+    environment:
+      ORBIT_LLM_BASE_URL: ${ORBIT_LLM_BASE_URL:-}
+      ORBIT_LLM_API_KEY: ${ORBIT_LLM_API_KEY:-}
+      ORBIT_LLM_MODEL: ${ORBIT_LLM_MODEL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8090/healthz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orbit
+      POSTGRES_DB: orbit
+      POSTGRES_PASSWORD: ${ORBIT_POSTGRES_PASSWORD:-orbit-postgres-demo}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${ORBIT_NEO4J_PASSWORD:-orbit-neo4j-demo}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 384m
+      NEO4J_server_memory_pagecache_size: 192m
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#*/}\" 'RETURN 1'"]
+      interval: 8s
+      timeout: 7s
+      retries: 15
+
+volumes:
+  postgres-data:
+  neo4j-data:

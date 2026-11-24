@@ -1,0 +1,8 @@
+.env
+.orbit/
+node_modules/
+dist/
+__pycache__/
+.venv/
+*.pyc
+.DS_Store

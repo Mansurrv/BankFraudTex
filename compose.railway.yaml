@@ -1,0 +1,29 @@
+services:
+  frontend:
+    ports: !override
+      - "0.0.0.0:${PORT:-8080}:8080"
+    restart: unless-stopped
+    depends_on:
+      api:
+        restart: true
+
+  api:
+    restart: unless-stopped
+    environment:
+      ORBIT_LOCAL_TEST: "false"
+      ORBIT_SECURE_COOKIES: "true"
+      ORBIT_ORIGIN: ${ORBIT_ORIGIN:?Set the Railway HTTPS origin}
+      ORBIT_CORPORATE_DOMAIN: ${ORBIT_CORPORATE_DOMAIN:?Set the bank email domain}
+
+  analytics:
+    restart: unless-stopped
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${ORBIT_POSTGRES_PASSWORD:?Set a PostgreSQL password}
+
+  neo4j:
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${ORBIT_NEO4J_PASSWORD:?Set a Neo4j password}
