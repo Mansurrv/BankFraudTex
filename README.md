@@ -29,6 +29,26 @@ On a Railway VM that serves `/app/index.html` while waking, use `frontend/railwa
 
 For a sign-in-only deployment, set `ORBIT_REGISTRATION_DISABLED=true` with secure cookies, `ORBIT_LOCAL_TEST=false`, and the account domain. SMTP credentials are optional in this mode. Provision existing users with `ORBIT_USERS` and unique passwords. New users created by an administrator remain pending until registration is re-enabled.
 
+## Deploy on Amazon EC2
+
+Use an EC2 instance with Docker Engine, Docker Compose 2.24.4 or newer, and persistent EBS storage for Docker's data directory. Use the instance's public IPv4 address or point a public DNS name at it. Allow inbound TCP 443 for HTTPS and certificate renewal. Keep database and API ports on the Compose network.
+
+Set `FFBI_HOSTNAME` to the DNS name or IPv4 address without a URL scheme, `ORBIT_CORPORATE_DOMAIN` to the existing accounts' email domain, and `ORBIT_POSTGRES_PASSWORD` and `ORBIT_NEO4J_PASSWORD` to distinct random hex passwords in a server-side `.env` readable only by its owner. Set `ORBIT_USERS` for accounts provisioned through the environment. Database-managed accounts are included in the database restore. Caddy terminates HTTPS, and self-registration is disabled.
+
+For a migration, start only PostgreSQL on EC2 first.
+
+```sh
+docker compose -f compose.yaml -f compose.aws.yaml up -d --wait postgres
+```
+
+Restore the source PostgreSQL archive into the fresh `orbit` database with `pg_restore --single-transaction --exit-on-error --no-owner --no-acl -U orbit -d orbit` inside the destination PostgreSQL container. For the final copy, pause application writes on Railway before taking the dump. Compare record counts on both servers and keep the source database available until the EC2 checks pass. Neo4j is rebuilt from PostgreSQL when the API starts.
+
+```sh
+docker compose -f compose.yaml -f compose.aws.yaml up -d --build --wait --wait-timeout 300
+```
+
+Check HTTPS, sign in with an existing account, and verify that the ledger and cases are available before directing users to the new site.
+
 ## Run without Docker
 
 The local mode requires Go 1.24+ and Node.js 22+. It persists the ledger, cases, and audit records in a local directory. Open two terminals at the project root.

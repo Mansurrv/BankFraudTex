@@ -1,0 +1,60 @@
+services:
+  https:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    environment:
+      FFBI_HOSTNAME: ${FFBI_HOSTNAME:?Set the public DNS name or IPv4 address of this FFBI instance}
+    ports:
+      - "443:443"
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+
+  frontend:
+    # The TLS proxy reaches this service over the Compose network.
+    ports: !reset []
+    restart: unless-stopped
+    depends_on:
+      api:
+        restart: true
+
+  api:
+    restart: unless-stopped
+    healthcheck:
+      start_period: 30s
+      timeout: 10s
+    environment:
+      ORBIT_LOCAL_TEST: "false"
+      ORBIT_REGISTRATION_DISABLED: "true"
+      ORBIT_SECURE_COOKIES: "true"
+      ORBIT_ORIGIN: https://${FFBI_HOSTNAME:?Set the public DNS name or IPv4 address of this FFBI instance}
+      ORBIT_CORPORATE_DOMAIN: ${ORBIT_CORPORATE_DOMAIN:?Set the domain of the existing FFBI accounts}
+
+  analytics:
+    restart: unless-stopped
+    healthcheck:
+      start_period: 60s
+      interval: 15s
+      timeout: 12s
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${ORBIT_POSTGRES_PASSWORD:?Set a PostgreSQL password}
+
+  neo4j:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7474/"]
+      start_period: 90s
+      interval: 15s
+      timeout: 10s
+    environment:
+      NEO4J_AUTH: neo4j/${ORBIT_NEO4J_PASSWORD:?Set a Neo4j password}
+
+volumes:
+  caddy-data:
+  caddy-config:
